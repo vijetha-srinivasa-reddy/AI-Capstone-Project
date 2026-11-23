@@ -1,2 +1,2 @@
 # AI-Capstone-Project
-MediMind - Medication Reminder Assistant
+MediMind - AI Medication Reminder Assistant
