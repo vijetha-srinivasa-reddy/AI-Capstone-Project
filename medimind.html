@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MediMind – AI Medication Reminder Assistant</title>
+<style>
+:root{--bg:#eceff3;--card:#fff;--tx:#1b2a3d;--mu:#6b7686;--pr:#1f3a5f;--go:#c9a227;--ln:#d5dae1;--bad:#b3392f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121821;--card:#1b2431;--tx:#e8edf3;--mu:#9aa6b6;--ln:#2d3848;--pr:#4f7cc0}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px system-ui,sans-serif}
+main{max-width:520px;margin:auto;padding:16px}h2{font-size:16px;margin:0 0 8px}
+header{background:var(--pr);color:#fff;border-radius:14px;padding:16px;border-bottom:4px solid var(--go)}header h1{margin:0;font-size:22px}header div{opacity:.85;font-size:13px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:14px;margin:12px 0}
+input,select,button{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--ln);background:var(--card);color:var(--tx)}
+button{background:var(--pr);color:#fff;border:0;cursor:pointer}.gold{background:var(--go);color:#1b2a3d;font-weight:600}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.row>*{flex:1;min-width:100px}
+.med{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--ln)}
+.med small{color:var(--mu);display:block;margin-top:2px}.ic{font-size:24px;margin-right:8px}.ok{color:#2e7d5b}.late{color:var(--bad)}
+.warn{color:#9a7600;font-weight:600}.chat{max-height:170px;overflow:auto}.b{margin:6px 0}.b.u{text-align:right;color:var(--pr);font-weight:600}
+.stat{display:flex;gap:8px}.stat div{flex:1;text-align:center;background:var(--bg);border-radius:10px;padding:8px}.stat b{font-size:20px;display:block;color:var(--pr)}
+a{color:var(--pr)}#ai{border-left:4px solid var(--go);padding-left:10px;margin:10px 0 0}
+</style></head><body><main>
+<header><h1>💊 MediMind</h1><div>AI Medication Reminder Assistant · SDG 3 Good Health</div></header>
+<div class="card" id="alarm" hidden style="border:2px solid var(--go)"></div>
+<div class="card"><h2>Today</h2><div class="stat"><div><b id="s1">0</b>Taken</div><div><b id="s2">0</b>Pending</div><div><b id="s3">0%</b>Adherence</div></div><p id="ai"></p></div>
+<div class="card"><h2>Weekly adherence</h2><svg id="wk" viewBox="0 0 320 120" width="100%"></svg><div id="wsum" style="color:var(--mu);font-size:12px"></div><div class="row" style="margin:8px 0 0"><button id="exp">⬇ Download report</button><button id="cp" class="gold">Copy report</button></div></div>
+<div class="card"><h2>Add medicine</h2>
+<div class="row"><input id="nl" placeholder='Quick add: "Aspirin 75 mg at 8 pm"'><button class="gold" id="nlb" style="flex:0 0 auto">Add</button></div>
+<div class="row"><input id="n" placeholder="Name"><input id="d" placeholder="Dose (500 mg)"></div>
+<div class="row"><select id="ic"><option value="💊">💊 Tablet</option><option value="🧴">🧴 Syrup</option><option value="💉">💉 Injection</option><option value="💧">💧 Drops</option></select><input id="t" type="time" value="09:00"><input id="l" type="number" min="0" placeholder="Doses left"></div>
+<div class="row"><input id="ph" type="tel" placeholder="Doctor/pharmacy phone (optional)"></div>
+<button id="add" style="width:100%">Add reminder</button></div>
+<div class="card"><h2>Today's schedule</h2><div class="row" style="align-items:center"><label><input type="checkbox" id="snd" checked> Alarm sound</label><button id="test" class="gold">Test alarm</button></div><div id="list"></div></div>
+<div class="card"><h2>Ask MediMind</h2><div class="chat" id="chat"><div class="b">Hi! Ask “what's next?”, “missed doses”, “refill” or “weekly”.</div></div>
+<div class="row" style="margin-top:8px"><input id="q" placeholder="Type a question"><button id="go" style="flex:0 0 auto">Ask</button></div></div>
+<p style="color:var(--mu);font-size:12px">Prototype for learning only. Not medical advice.</p>
+<script>
+const $=i=>document.getElementById(i),dk=o=>{const a=new Date();a.setDate(a.getDate()-o);return a.toISOString().slice(0,10)};
+const mins=t=>+t.slice(0,2)*60+ +t.slice(3),nowM=()=>{const a=new Date();return a.getHours()*60+a.getMinutes()},fmt=t=>{const h=+t.slice(0,2);return (h%12||12)+t.slice(2)+(h<12?" AM":" PM")};
+let S={day:dk(0),meds:[],hist:{}};try{S=JSON.parse(localStorage.getItem("mm3"))||S}catch(e){}
+if(!S.meds.length){S.meds=[{n:"Metformin",d:"500 mg",t:"08:00",ic:"💊",ph:"",left:2,x:true},{n:"Cough syrup",d:"10 ml",t:"13:00",ic:"🧴",ph:"",left:12,x:false},{n:"Insulin",d:"10 units",t:"21:00",ic:"💉",ph:"",left:9,x:false}];[[6,3,3],[5,3,2],[4,3,3],[3,3,3],[2,3,1],[1,3,2]].forEach(([o,t,k])=>S.hist[dk(o)]=[k,t])}
+if(S.day!==dk(0)){S.meds.forEach(m=>{m.x=false;m.a=0;m.sn=null;m.ring=null});S.day=dk(0)}
+const hm=x=>String(Math.floor(x/60)%24).padStart(2,"0")+":"+String(x%60).padStart(2,"0"),eff=m=>m.sn!=null?m.sn:mins(m.t),late=m=>!m.x&&eff(m)<nowM(),sv=()=>{try{localStorage.setItem("mm3",JSON.stringify(S))}catch(e){}};
+const low=m=>m.left!==""&&m.left!=null&&m.left<=3;
+function chart(){const days=[6,5,4,3,2,1,0].map(o=>{const h=S.hist[dk(o)]||[0,0];return{l:new Date(dk(o)+"T12:00").toLocaleDateString("en",{weekday:"short"}),p:h[1]?h[0]/h[1]:0,t:h[1]}});
+$("wk").innerHTML=days.map((d,i)=>`<rect x="${i*45+8}" y="${90-d.p*80}" width="30" height="${d.p*80||2}" rx="5" fill="${i==6?'#c9a227':'#1f3a5f'}"/><text x="${i*45+23}" y="108" font-size="11" text-anchor="middle" fill="currentColor">${d.l}</text><text x="${i*45+23}" y="${84-d.p*80}" font-size="10" text-anchor="middle" fill="currentColor">${d.t?Math.round(d.p*100)+'%':''}</text>`).join("");
+const v=days.filter(d=>d.t);const avg=v.length?Math.round(100*v.reduce((a,d)=>a+d.p,0)/v.length):0;$("wsum").textContent=`7-day average: ${avg}% (earlier days are sample data)`;return{avg,days}}
+function draw(){S.meds.sort((a,b)=>mins(a.t)-mins(b.t));
+$("list").innerHTML=S.meds.map((m,i)=>`<div class="med"><div style="display:flex;align-items:center"><span class="ic">${m.ic}</span><div><b>${m.n}</b> · ${m.d}<small>⏰ ${fmt(m.t)} <span class="${m.x?'ok':late(m)?'late':''}">${m.x?'✔ Taken':late(m)?'⚠ Missed – take now':m.sn!=null?'😴 Snoozed till '+fmt(hm(m.sn)):'Upcoming'}</span></small>${low(m)?`<small class="warn">🔔 Refill soon – ${m.left} left ${m.ph?`· <a href="tel:${m.ph}">📞 Call</a>`:''}</small>`:m.ph?`<small><a href="tel:${m.ph}">📞 ${m.ph}</a></small>`:''}</div></div><div>${m.x?'':`<button onclick="tk(${i})">Taken</button> ${eff(m)<=nowM()?`<button class="gold" onclick="sz(${i})">Snooze</button> `:''}`}<button style="background:#8b95a3" onclick="rm(${i})">✕</button></div></div>`).join("")||"No medicines yet.";
+const k=S.meds.filter(m=>m.x).length,n=S.meds.length;S.hist[dk(0)]=[k,n];$("s1").textContent=k;$("s2").textContent=n-k;$("s3").textContent=n?Math.round(100*k/n)+"%":"0%";
+const w=chart(),L=S.meds.filter(late).length,R=S.meds.filter(low);
+$("ai").textContent="🤖 "+(L?`${L} dose(s) overdue – take them as prescribed or ask your doctor.`:R.length?`${R[0].n} is running low – plan a refill.`:w.avg>=80?"Excellent consistency this week. Keep it up!":"You're on track today. Try to take every dose on time.");sv()}
+function tk(i){const m=S.meds[i];m.x=true;if(m.left!==""&&m.left>0)m.left--;draw()}function sz(i){S.meds[i].sn=nowM()+10;S.meds[i].ring=null;$("alarm").hidden=true;draw()}
+let cur=null;function beep(){if(!$("snd").checked)return;try{const c=new (window.AudioContext||window.webkitAudioContext)();[0,.35,.7].forEach(t=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=880;g.gain.value=.2;o.connect(g);g.connect(c.destination);o.start(c.currentTime+t);o.stop(c.currentTime+t+.2)});navigator.vibrate&&navigator.vibrate([300,150,300])}catch(e){}}
+function ring(m){cur=m;m.ring=eff(m);$("alarm").hidden=false;$("alarm").innerHTML=`<h2>⏰ Time for ${m.ic} ${m.n}</h2><div>${m.d}</div><div class="row" style="margin-top:8px"><button onclick="tkM()">Taken</button><button class="gold" onclick="szM()">Snooze 10 min</button><button style="background:#8b95a3" onclick="$('alarm').hidden=true">Dismiss</button></div>`;beep();try{new Notification("Time for "+m.n,{body:m.d})}catch(e){}}
+function tkM(){const i=S.meds.indexOf(cur);if(i>=0)tk(i);$("alarm").hidden=true}function szM(){const i=S.meds.indexOf(cur);if(i>=0)sz(i)}
+function chk(){draw();S.meds.forEach(m=>{const d=nowM()-eff(m);if(!m.x&&d>=0&&d<=1&&m.ring!==eff(m))ring(m)})}
+function rep(){const L=["MediMind - Weekly Adherence Report","Generated: "+new Date().toLocaleString(),""];[6,5,4,3,2,1,0].forEach(o=>{const h=S.hist[dk(o)];L.push(dk(o)+": "+(h&&h[1]?`${h[0]}/${h[1]} doses (${Math.round(100*h[0]/h[1])}%)`:"no data"))});L.push("","7-day average: "+chart().avg+"%","","Medicines:");S.meds.forEach(m=>L.push(`- ${m.n} ${m.d} at ${fmt(m.t)}`+(m.left!==""?`, ${m.left} left`:"")));L.push("","Note: earlier days in this prototype are sample data. Not medical advice.");return L.join("\n")}
+$("exp").onclick=async()=>{let dl=null;try{dl=window.claude&&await window.claude.use("downloads")}catch(e){}
+if(dl){try{await dl.save({filename:"MediMind_Weekly_Report.txt",data:rep()})}catch(e){}return}
+const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([rep()],{type:"text/plain"}));a.download="MediMind_Weekly_Report.txt";a.click()};
+$("cp").onclick=async()=>{try{await navigator.clipboard.writeText(rep());$("cp").textContent="Copied ✔"}catch(e){$("cp").textContent="Copy failed"}setTimeout(()=>$("cp").textContent="Copy report",1800)};
+$("test").onclick=()=>ring(S.meds.find(m=>!m.x)||S.meds[0]||{n:"Test",d:"Sample dose",ic:"💊"});
+function rm(i){S.meds.splice(i,1);draw()}
+function addM(n,d,t,ic,ph,l){if(!n)return;S.meds.push({n,d:d||"1 dose",t:t||"09:00",ic:ic||"💊",ph:ph||"",left:l===""||l==null?"":+l,x:false});draw()}
+$("add").onclick=()=>{addM($("n").value.trim(),$("d").value.trim(),$("t").value,$("ic").value,$("ph").value.trim(),$("l").value);["n","d","ph","l"].forEach(i=>$(i).value="")};
+function parse(s){const tm=s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i),dm=s.match(/(\d+(?:\.\d+)?)\s*(mg|ml|mcg|g|units?|iu)/i);let t="09:00";
+if(tm){let h=+tm[1]%12+(/pm/i.test(tm[3])?12:0);t=String(h).padStart(2,"0")+":"+(tm[2]||"00")}
+const ic=/syrup|ml\b/i.test(s)?"🧴":/insulin|injection|units?/i.test(s)?"💉":/drop/i.test(s)?"💧":"💊";
+const n=s.replace(/^(add|remind me to take|remind me|take)\s+/i,"").replace(/\s+at\s+.*$/i,"").replace(/\d+(\.\d+)?\s*(mg|ml|mcg|g|units?|iu)/i,"").trim();
+return{n:n.charAt(0).toUpperCase()+n.slice(1),d:dm?dm[0]:"",t,ic}}
+$("nlb").onclick=()=>{const s=$("nl").value.trim();if(!s)return;const p=parse(s);addM(p.n,p.d,p.t,p.ic);$("nl").value=""};
+function reply(q){q=q.toLowerCase();const p=S.meds.filter(m=>!m.x).sort((a,b)=>mins(a.t)-mins(b.t));
+if(/add|remind me/.test(q)){const x=parse(q);if(x.n){addM(x.n,x.d,x.t,x.ic);return`Added ${x.n} ${x.d} at ${fmt(x.t)}.`}}
+if(/next|upcoming|when/.test(q)){const n=p.find(m=>mins(m.t)>=nowM())||p[0];return n?`Next: ${n.n} (${n.d}) at ${fmt(n.t)}.`:"All doses taken today 🎉"}
+if(/miss|late|overdue/.test(q)){const l=S.meds.filter(late);return l.length?"Overdue: "+l.map(m=>m.n).join(", ")+".":"No missed doses."}
+if(/refill|stock|left|running/.test(q)){const r=S.meds.filter(low);return r.length?"Refill needed: "+r.map(m=>`${m.n} (${m.left} left)`).join(", ")+".":"All medicines are well stocked."}
+if(/week|trend|progress|adherence/.test(q)){const w=chart(),b=w.days.filter(d=>d.t).sort((a,c)=>c.p-a.p)[0];return`Your 7-day average is ${w.avg}%. Best day: ${b?b.l:"–"}.`}
+return"I can help with: what's next, missed doses, refill, weekly progress, or “add Aspirin 75 mg at 8 pm”."}
+$("go").onclick=()=>{const q=$("q").value.trim();if(!q)return;const r=reply(q);$("chat").innerHTML+=`<div class="b u">${q.replace(/</g,"&lt;")}</div><div class="b">${r}</div>`;$("q").value="";$("chat").scrollTop=1e5};
+draw();setInterval(chk,15000);
+try{Notification.requestPermission()}catch(e){}
+</script></main></body></html>
